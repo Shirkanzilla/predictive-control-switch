@@ -4,15 +4,21 @@ import torch
 import numpy as np
 from load_model import load_guide
 
+import pdb
+import os
+os.environ["DISPLAY"] = ":0"
 
 env = safety_gymnasium.make('SafetyPointGoal1-v0', render_mode="human")
 #env = safety_gymnasium.make('SafetyCarFormulaOne1-v0', render_mode="human")
 obs_space = env.observation_space
 act_space = env.action_space
 
-agent = GaussianLearningActor(obs_space, act_space, [256,256,256,256,256], activation='relu', weight_initialization_mode="orthogonal")
+agent = GaussianLearningActor(obs_space, act_space, [4], activation='relu')
 safe_agent = load_guide("/home/user/bachelor/runs/PPOLag-{SafetyPointGoal1-v0}/seed-000-2025-05-13-17-51-08", "epoch-50.pt")[1]
 observation, info = env.reset()
+task = env.unwrapped.__getattribute__("task")
+#breakpoint()
+
 
 episode_over = False
 is_sampling = False
@@ -31,7 +37,7 @@ while not episode_over:
             sampling_step = 0
             print("unsafe")
     else:
-        print(env.unwrapped.__getattribute__("agent").model.body_pos)
+        print(env.unwrapped.__getattribute__("task").agent.pos)
         obs_tensor = torch.from_numpy(observation).float()
         action = agent.predict(obs_tensor, deterministic=True).detach().numpy()
         if np.random.random()<probability_for_datapoint:
