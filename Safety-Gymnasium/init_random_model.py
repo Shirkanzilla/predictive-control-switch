@@ -13,11 +13,12 @@ env = safety_gymnasium.make('SafetyPointGoal1-v0', render_mode="human")
 obs_space = env.observation_space
 act_space = env.action_space
 
-agent = GaussianLearningActor(obs_space, act_space, [4], activation='relu')
+agent = GaussianLearningActor(obs_space, act_space, [256, 256, 256], activation='relu')
 safe_agent = load_guide("/home/user/bachelor/runs/PPOLag-{SafetyPointGoal1-v0}/seed-000-2025-05-13-17-51-08", "epoch-50.pt")[1]
 observation, info = env.reset()
+#print(env.unwrapped.__getattribute__("model").geom_friction)
 task = env.unwrapped.__getattribute__("task")
-#breakpoint()
+print(task.model.geom_friction[1]) # geom friction of the agent
 
 
 episode_over = False
@@ -37,12 +38,11 @@ while not episode_over:
             sampling_step = 0
             print("unsafe")
     else:
-        print(env.unwrapped.__getattribute__("task").agent.pos)
         obs_tensor = torch.from_numpy(observation).float()
         action = agent.predict(obs_tensor, deterministic=True).detach().numpy()
         if np.random.random()<probability_for_datapoint:
             # begin sampling with the safe agent
-            is_sampling = False
+            is_sampling = True
             print("safe")
         observation, reward, cost, terminated, truncated, info = env.step(action)
         episode_over = terminated or truncated
