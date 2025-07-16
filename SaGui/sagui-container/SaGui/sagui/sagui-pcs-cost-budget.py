@@ -10,10 +10,12 @@ from sagui.utils.logx import EpochLogger
 from sagui.utils.mpi_tf import sync_all_params, MpiAdamOptimizer
 from sagui.utils.mpi_tools import mpi_fork, mpi_sum, proc_id, mpi_statistics_scalar, num_procs
 from safety_gym.envs.engine import Engine
+import torch
 from sagui.env_configs import register_configs
 
 from sagui.utils.load_utils_transfer import load_policy_transfer
 from sagui.utils.logx import EpochLogger
+import sagui.utils.torch_models
 
 import random
 
@@ -186,7 +188,7 @@ Soft Actor-Critic
 """
 
 
-def sac(env_fn, get_logp_a_fn, get_teacher_a_fn, teacher_size, teacher_keys, actor_fn=mlp_actor, critic_fn=mlp_critic,  ac_kwargs=dict(), seed=0,
+def sac(env_fn, get_logp_a_fn, get_teacher_a_fn, teacher_size, teacher_keys, classifier, regressor, device, actor_fn=mlp_actor, critic_fn=mlp_critic,  ac_kwargs=dict(), seed=0,
         steps_per_epoch=1000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-4, batch_size=1024, local_start_steps=int(1e3),
         max_ep_len=1000, logger_kwargs=dict(), save_freq=10, local_update_after=int(1e3),
@@ -546,6 +548,21 @@ def sac(env_fn, get_logp_a_fn, get_teacher_a_fn, teacher_size, teacher_keys, act
 
         o_teacher = obs_abs(env)  # get the corresponding obs of safe-explorer
 
+        if not rec:
+            remaining_cost_budget = cost_constraint - ep_cost
+            data = np.append(o, a)
+            # remove features not used in the model namely "velocimeter2", "accelerometer2", "magnetometer2", "gyro0" and "gyro1"
+            data = np.delete(data, [2, 5, 6, 7, 11])
+            data = torch.from_numpy(data).float()
+            data = data.unsqueeze(0)
+            data = data.to(device)
+            with torch.no_grad():
+                # start recovery if the classifier assigns the non-zero class and the regressor predicts an expected cost higher than the remaining cost budget
+                if classifier(data).item() > 0.5:
+                    if regressor(data).item() > remaining_cost_budget:
+                        rec = True
+                        rec_step = t
+
         if rec:
             a = get_teacher_a_fn(o_teacher)
             logp_a_student = get_logp_a_student(o, a)
@@ -570,7 +587,6 @@ def sac(env_fn, get_logp_a_fn, get_teacher_a_fn, teacher_size, teacher_keys, act
 
         if ep_cost > 0 and rec == False:
             rec = True
-            rec_step = t
 
         # Track cumulative cost over training
         cum_cost += c
@@ -729,6 +745,8 @@ if __name__ == '__main__':
     parser.add_argument('--damp_s', type=int, default=10)
     parser.add_argument('--logger_kwargs_str', type=json.loads,
                         default='{"output_dir": "./data_sagui-cs"}')
+    parser.add_argument('--classifier_path', type=str, default='')
+    parser.add_argument('--regressor_path', type=str, default='')
     args = parser.parse_args()
 
     try:
@@ -744,16 +762,22 @@ if __name__ == '__main__':
     logger_kwargs = args.logger_kwargs_str
 
     teacher_env, get_logp_a, get_teacher_a, _ = load_policy_transfer(
-        'guide/', 4)
+        'data_static-v0/', 4)
 
     _teacher_size = teacher_env.obs_flat_size
     _teacher_keys = teacher_env.obs_space_dict.keys()
-    for _ in range(args.epochs):
-        sac(lambda: gym.make(args.env), get_logp_a_fn=get_logp_a, get_teacher_a_fn=get_teacher_a, teacher_size=_teacher_size, teacher_keys=_teacher_keys, actor_fn=mlp_actor, critic_fn=mlp_critic,
-            ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, seed=args.seed, epochs=1, batch_size=args.batch_size,
-            logger_kwargs=logger_kwargs, steps_per_epoch=args.steps_per_epoch,
-            update_freq=args.update_freq, lr=args.lr, render=args.render,
-            local_start_steps=args.local_start_steps, local_update_after=args.local_update_after,
-            fixed_entropy_bonus=args.fixed_entropy_bonus, entropy_constraint=args.entropy_constraint,
-            fixed_cost_penalty=args.fixed_cost_penalty, cost_constraint=args.cost_constraint, cost_lim=args.cost_lim, lr_scale=args.lr_s, damp_scale=args.damp_s,
-            )
+
+    # load classifier and regression models
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    classifier = torch.load(args.classifier_path).to(device)
+    regressor = torch.load(args.regression_path).to(device)
+
+    sac(lambda: gym.make(args.env), get_logp_a_fn=get_logp_a, get_teacher_a_fn=get_teacher_a, teacher_size=_teacher_size, teacher_keys=_teacher_keys, classifier=classifier, 
+        regressor=regressor, actor_fn=mlp_actor, critic_fn=mlp_critic, device=device, 
+        ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, seed=args.seed, epochs=args.epochs, batch_size=args.batch_size,
+        logger_kwargs=logger_kwargs, steps_per_epoch=args.steps_per_epoch,
+        update_freq=args.update_freq, lr=args.lr, render=args.render,
+        local_start_steps=args.local_start_steps, local_update_after=args.local_update_after,
+        fixed_entropy_bonus=args.fixed_entropy_bonus, entropy_constraint=args.entropy_constraint,
+        fixed_cost_penalty=args.fixed_cost_penalty, cost_constraint=args.cost_constraint, cost_lim=args.cost_lim, lr_scale=args.lr_s, damp_scale=args.damp_s,
+        )
