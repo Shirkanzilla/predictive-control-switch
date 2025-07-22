@@ -548,7 +548,15 @@ def sac(env_fn, get_logp_a_fn, get_teacher_a_fn, teacher_size, teacher_keys, cla
 
         o_teacher = obs_abs(env)  # get the corresponding obs of safe-explorer
 
-        if not rec:
+        if rec:
+            a = get_teacher_a_fn(o_teacher)
+            logp_a_student = get_logp_a_student(o, a)
+            r1 = get_logp_a_fn(o_teacher, a)
+            rho = np.maximum(np.minimum(np.exp(logp_a_student - r1), 2.0), 0.1)
+        else:
+            a = get_action(o)
+            r1 = get_logp_a_fn(o_teacher, a)
+            rho = 1.0
             data = np.append(o, a)
             # remove features not used in the model, namely "velocimeter2", "accelerometer2", "magnetometer2", "gyro0" and "gyro1"
             data = np.delete(data, [2, 5, 6, 7, 11])
@@ -560,16 +568,6 @@ def sac(env_fn, get_logp_a_fn, get_teacher_a_fn, teacher_size, teacher_keys, cla
                 if classifier(data).item() > 0.5:
                     rec = True
                     rec_step = t
-
-        if rec:
-            a = get_teacher_a_fn(o_teacher)
-            logp_a_student = get_logp_a_student(o, a)
-            r1 = get_logp_a_fn(o_teacher, a)
-            rho = np.maximum(np.minimum(np.exp(logp_a_student - r1), 2.0), 0.1)
-        else:
-            a = get_action(o)
-            r1 = get_logp_a_fn(o_teacher, a)
-            rho = 1.0
 
         # Step the env
         o2, r, d, info = env.step(a)
