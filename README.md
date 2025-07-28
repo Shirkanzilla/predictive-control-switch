@@ -16,16 +16,13 @@ This enables a preventive and potentially more accurate safety mechanism compare
 
 ## Repository Structure
 
-This repository consists of two main components:
+This repository consists of four main components:
 
-### 1. Dataset Generation & Model Training in /model-training/
-
+### 1. Dataset Generation in /Predictive Control-Switch/dataset_creation
 train_safe_agent.py is used to train a safe agent using PPOLag, which is used to measure the expected cost connected to a sample.
-
-With record_video.py, this safe agent can be recorded and sanity checked.
-
 In create_dataset.ipynb, a dataset is created, preprocessed, and saved. We do that for the "SafetyPointGoal1-v0" environment, but by changing the env, a dataset could be generated for a different task.
 
+### 3. Neural network training in /Predictive Control-Switch/neural_network_training
 In train_neural_network.ipynb, we train:
 - **A classifier**: To predict whether the expected cost is zero.
 - **A regression model**: To directly estimate the expected cost based on observations and actions, but only on non-zero samples.
@@ -34,13 +31,14 @@ These models are then saved.
 manual_nn_debugging.py offers a way to manually play a safety-gymnasium environment and do a sanity check on the performance of the models. 
 The predicted cost is printed to the console for every timestep.
 
+### 4. Benchmarks in /Predictive Control-Switch/method_comparison
+In comparison.ipynb, the vanilla Control-Switch and the newly proposed Predictive Control-Switch methods are benchmarked.
 
-### 2. Modified Guided Safe Exploration (GSE) Framework
+### 5. Utility uses throughout in /Predictive Control-Switch/misc
+With record_video.py, this safe agent can be recorded and sanity checked.
+The other files contain code to test various things used throughout the project.
 
-This component is based on a cloned and adapted version of the [sagui-container](https://github.com/MarkelZ/sagui-container) repository. 
-It integrates our cost prediction models in place of the original Control-Switch method.
 
-We do that for two 
 
 ---
 
@@ -48,10 +46,10 @@ We do that for two
 
 ### Prerequisites
 
-- Python 3.7
-- mujoco 2.0+ in home/mujoco and in ./sagui-container/mujoco
+- Python 3.8
+- mujoco 2.1.0 in ~/.mujoco
+- valid mujoco key from https://www.roboti.us/license.html
 - Python packages listed in `requirements.txt`
-- For easier installation: Docker engine
 
 ```bash
 pip install -r requirements.txt
