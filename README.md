@@ -22,7 +22,7 @@ This repository consists of four main components:
 train_safe_agent.py is used to train a safe agent using PPOLag, which is used to measure the expected cost connected to a sample.
 In create_dataset.ipynb, a dataset is created, preprocessed, and saved. We do that for the "SafetyPointGoal1-v0" environment, but by changing the env, a dataset could be generated for a different task.
 
-### 3. Neural network training in /Predictive Control-Switch/neural_network_training
+### 2. Neural network training in /Predictive Control-Switch/neural_network_training
 In train_neural_network.ipynb, we train:
 - **A classifier**: To predict whether the expected cost is zero.
 - **A regression model**: To directly estimate the expected cost based on observations and actions, but only on non-zero samples.
@@ -31,10 +31,10 @@ These models are then saved.
 manual_nn_debugging.py offers a way to manually play a safety-gymnasium environment and do a sanity check on the performance of the models. 
 The predicted cost is printed to the console for every timestep.
 
-### 4. Benchmarks in /Predictive Control-Switch/method_comparison
+### 3. Benchmarks in /Predictive Control-Switch/method_comparison
 In comparison.ipynb, the vanilla Control-Switch and the newly proposed Predictive Control-Switch methods are benchmarked.
 
-### 5. Utility uses throughout in /Predictive Control-Switch/misc
+### 4. Utility uses throughout in /Predictive Control-Switch/misc
 With record_video.py, this safe agent can be recorded and sanity checked.
 The other files contain code to test various things used throughout the project.
 
