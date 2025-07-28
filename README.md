@@ -34,7 +34,7 @@ The predicted cost is printed to the console for every timestep.
 ### 3. Benchmarks in /Predictive Control-Switch/method_comparison
 In comparison.ipynb, the vanilla Control-Switch and the newly proposed Predictive Control-Switch methods are benchmarked.
 
-### 4. Utility uses throughout in /Predictive Control-Switch/misc
+### 4. Utility used throughout in /Predictive Control-Switch/misc
 With record_video.py, this safe agent can be recorded and sanity checked.
 The other files contain code to test various things used throughout the project.
 
