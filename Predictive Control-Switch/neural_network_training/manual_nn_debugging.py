@@ -87,10 +87,10 @@ def predict_expected_cost(obs, action, classifier, regressor):
             return 0
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-classifier = torch.load("/home/user/bachelor/Safety-Gymnasium/classifier.pt")
+classifier = torch.load("./Predictive Control-Switch/neural_network_training/classifier.pt")
 classifier.to(device)
 classifier.eval()
-regressor = torch.load("/home/user/bachelor/Safety-Gymnasium/regressor.pt")
+regressor = torch.load("./Predictive Control-Switch/neural_network_training/regressor.pt")
 regressor.to(device)
 regressor.eval()
 
