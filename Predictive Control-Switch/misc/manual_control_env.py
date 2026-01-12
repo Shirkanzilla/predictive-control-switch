@@ -46,7 +46,12 @@ class InputAction:
 #robot = "Point"
 #env = safety_gymnasium.make(f'Safety{robot}FormulaOne1-v0', render_mode='human')
 robot = "InvertedPendulum"
-env = gymnasium.make('InvertedPendulum-v4', render_mode="human")
+safety_gymnasium.register(id="CustomInvertedPendulum-v4",
+    entry_point="custom_inverted_pendulum_v4:CustomInvertedPendulumEnv",
+    max_episode_steps=1000,
+    reward_threshold=950.0,
+)
+env = safety_gymnasium.make('CustomInvertedPendulum-v4', render_mode="human")
 obs, info = env.reset()
 
 input_act = InputAction()
@@ -63,9 +68,9 @@ while True:
 
     #print(env.action_space.sample())
     act = input_act.get_act_from_input(robot)
-    obs, reward, terminated, truncated, info = env.step(act)
+    obs, reward, cost, terminated, truncated, info = env.step(act)
     #bs, reward, cost, terminated, truncated, info = env.step(act)
-    #print(f"Action: {act}, Reward: {reward}, Cost: {cost}")
+    print(f"Action: {act}, Reward: {reward}, Cost: {cost}")
 
     ep_ret += reward
-    #ep_cost += cost
+    ep_cost += cost
