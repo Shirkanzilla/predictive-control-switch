@@ -3,3 +3,6 @@ StableBaselines/
 safety_gym_py38/
 SaGui/sagui-container/SaGuiVenv/
 .vscode/
+.python-version
+runs/
+__pycache__/

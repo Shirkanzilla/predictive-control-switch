@@ -1,0 +1,6 @@
+torch
+gymnasium
+safety_gymnasium
+numpy
+omnisafe
+mujoco

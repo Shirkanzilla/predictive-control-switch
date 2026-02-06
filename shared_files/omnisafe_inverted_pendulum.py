@@ -1,8 +1,22 @@
+from __future__ import annotations
+
+import random
+import omnisafe
+from typing import Any, ClassVar
+
+import torch
+from gymnasium import spaces
+
+from omnisafe.envs.core import CMDP, env_register, env_unregister
+
 import numpy as np
 
 from gymnasium import utils
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
+
+import omnisafe
+from omnisafe.envs.core import env_register
 
 
 DEFAULT_CAMERA_CONFIG = {
@@ -11,7 +25,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class CustomInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
+class SafetyInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
     """
     ## Description
 
@@ -97,7 +111,7 @@ class CustomInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         "render_modes": [
             "human",
             "rgb_array",
-            "depth_array",
+            "depth_array"
         ],
         "render_fps": 25,
     }
@@ -107,7 +121,7 @@ class CustomInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         observation_space = Box(low=-np.inf, high=np.inf, shape=(4,), dtype=np.float64)
         MujocoEnv.__init__(
             self,
-            "inverted_pendulum.xml",
+            "/home/user/predictive-control-switch/shared_files/unlocked_inverted_pendulum.xml",
             2,
             observation_space=observation_space,
             default_camera_config=DEFAULT_CAMERA_CONFIG,
@@ -115,16 +129,24 @@ class CustomInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         )
 
     def step(self, a):
-        reward = 1.0
         self.do_simulation(a, self.frame_skip)
         ob = self._get_obs()
         terminated = bool(not np.isfinite(ob).all()) # or (np.abs(ob[1]) > 1))
-        cost = 0
-        if np.abs(ob[1]) > 0.2:
-            cost = 20 * np.abs(ob[1])
-        if np.abs(ob[1]) > 1 :
-            cost = 100
-        if self.render_mode == "human":
+        reward = 0.0
+        angle = np.degrees(np.abs(ob[1])) % 360
+        if np.abs(ob[1]) <= 0.2: # about 11,46 degrees
+            cost = 0.0
+            reward = 1.0
+        elif np.abs(angle - 180) > 30: # punish positions typically reached in recovery less hard
+            cost = 0.1
+        else:
+            cost = 1.0
+
+        #if np.abs(ob[1]) > 0.2:
+        #   cost = min(np.abs(ob[1]), 1)
+        #else:
+        #    reward = 1.0
+        if self.render_mode != None:
             self.render()
         return ob, reward, cost, terminated, False, {}
 
@@ -140,3 +162,67 @@ class CustomInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
 
     def _get_obs(self):
         return np.concatenate([self.data.qpos, self.data.qvel]).ravel()
+    
+class OmnisafeInvertedPendulumEnv(CMDP):
+    _support_envs: ClassVar[list[str]] = ["SafetyInvertedPendulum-v4"]
+
+    need_auto_reset_wrapper = True
+    need_time_limit_wrapper = False
+
+    def __init__(self, env_id: str, **kwargs) -> None:
+        self._count = 0
+        self._num_envs = 1
+        self._inner_env = SafetyInvertedPendulumEnv()
+        self._observation_space = self._inner_env.observation_space
+        self._action_space = self._inner_env.action_space
+
+    def set_seed(self, seed: int) -> None:
+        random.seed(seed)
+
+    def reset(
+        self,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+        ) -> tuple[torch.Tensor, dict]:
+        if seed is not None:
+            self.set_seed(seed)
+        obs = self._inner_env.reset_model()
+        self._count = 0
+        return obs, {}
+
+    @property
+    def max_episode_steps(self) -> None:
+        """The max steps per episode."""
+        return 1000
+    
+    def render(self) -> Any:
+        pass
+
+    def close(self) -> Any:
+        self._inner_env.close()
+
+    def step(
+        self,
+        action: torch.Tensor,
+        ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
+        self._count += 1
+        obs, reward, cost, terminated, truncated, info = self._inner_env.step(action.detach().cpu().numpy())
+        truncated = self._count > 1000
+        obs, reward, cost, terminated, truncated = (
+            torch.as_tensor(x, dtype=torch.float32, device=self._device)
+            for x in (obs, reward, cost, terminated, truncated)
+        )
+        if 'final_observation' in info:
+            info['final_observation'] = np.array(
+                [
+                    array if array is not None else np.zeros(obs.shape[-1])
+                    for array in info['final_observation']
+                ],
+            )
+            info['final_observation'] = torch.as_tensor(
+                info['final_observation'],
+                dtype=torch.float32,
+                device=self._device,
+            )
+
+        return obs, reward, cost, terminated, truncated, info

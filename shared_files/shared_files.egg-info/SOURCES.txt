@@ -1,0 +1,6 @@
+setup.py
+shared_files.egg-info/PKG-INFO
+shared_files.egg-info/SOURCES.txt
+shared_files.egg-info/dependency_links.txt
+shared_files.egg-info/requires.txt
+shared_files.egg-info/top_level.txt

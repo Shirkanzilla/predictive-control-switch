@@ -2,7 +2,7 @@ from omnisafe.models.actor import GaussianLearningActor
 import safety_gymnasium
 import torch
 import numpy as np
-from load_model import load_guide
+from shared_files.load_model import load_guide
 
 import pdb
 import os
