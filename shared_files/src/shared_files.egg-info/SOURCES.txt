@@ -1,6 +1,10 @@
 README.md
 pyproject.toml
-setup.py
+helpers/__init__.py
+helpers/custom_agent.py
+helpers/load_model.py
+helpers/neural_network_definitions.py
+helpers/omnisafe_inverted_pendulum.py
 shared_files.egg-info/PKG-INFO
 shared_files.egg-info/SOURCES.txt
 shared_files.egg-info/dependency_links.txt

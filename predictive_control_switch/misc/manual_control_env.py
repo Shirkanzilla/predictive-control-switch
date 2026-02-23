@@ -1,6 +1,6 @@
 import os
 from pynput.keyboard import Listener, KeyCode
-from omnisafe_inverted_pendulum import OmnisafeInvertedPendulumEnv
+import helpers.saute_omnisafe_inverted_pendulum
 import safety_gymnasium
 import gymnasium
 from time import sleep
@@ -45,12 +45,12 @@ class InputAction:
 #robot = "Point"
 #env = safety_gymnasium.make(f'Safety{robot}FormulaOne1-v0', render_mode='human')
 robot = "InvertedPendulum"
-safety_gymnasium.register(id="SafetyInvertedPendulum-v4",
-    entry_point="omnisafe_inverted_pendulum:SafetyInvertedPendulumEnv",
+safety_gymnasium.register(id="SauteSafetyInvertedPendulum-v4",
+    entry_point="saute_omnisafe_inverted_pendulum:SauteSafetyInvertedPendulumEnv",
     max_episode_steps=1000,
     reward_threshold=950.0,
 )
-env = safety_gymnasium.make('SafetyInvertedPendulum-v4', render_mode="human")
+env = safety_gymnasium.make('SauteSafetyInvertedPendulum-v4', render_mode="rgb_array")
 obs, info = env.reset()
 
 input_act = InputAction()

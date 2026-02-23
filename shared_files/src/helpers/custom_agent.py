@@ -11,7 +11,6 @@ from safety_gymnasium.utils.registration import register
 
 import pdb
 import os
-os.environ["DISPLAY"] = ":0"
 
 env_id = "SafetyPointSigWallGoalLevel1-v0"
 config = {'agent_name': 'Point'}

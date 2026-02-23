@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "helpers"
+version = "0.1.1"
+requires-python = ">= 3.8"
+description = "Shared files for the predictive control switch project"
+keywords = []
+
+authors = [
+  {name = "Joshua Hertz-Eichenrode", email = "joshua.hertz-eichenrode@rub.de"}
+]
+readme = "README.md"
+
+dependencies = [
+    "omnisafe",
+    "safety_gymnasium",
+    "numpy",
+    "torch"
+]
