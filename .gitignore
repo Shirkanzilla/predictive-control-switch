@@ -2,6 +2,7 @@ RL/
 StableBaselines/
 safety_gym_py38/
 SaGui/sagui-container/SaGuiVenv/
+mujoco/
 .vscode/
 .python-version
 runs/

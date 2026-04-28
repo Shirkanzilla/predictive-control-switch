@@ -1,10 +1,12 @@
 import os
-from pynput.keyboard import Listener, KeyCode
+#from pynput.keyboard import Listener, KeyCode
 import helpers.saute_omnisafe_inverted_pendulum
 import safety_gymnasium
 import gymnasium
 from time import sleep
-    
+from helpers.register_envs import register_envs
+
+'''
 class InputAction:
     def __init__(self):
         self.keys = {'i': False, 'j': False, 'k': False, 'l': False}
@@ -42,18 +44,16 @@ class InputAction:
             if self.keys['l']:
                 act[0] = 1
         return act
+'''
+register_envs()
+
 #robot = "Point"
 #env = safety_gymnasium.make(f'Safety{robot}FormulaOne1-v0', render_mode='human')
 robot = "InvertedPendulum"
-safety_gymnasium.register(id="SauteSafetyInvertedPendulum-v4",
-    entry_point="saute_omnisafe_inverted_pendulum:SauteSafetyInvertedPendulumEnv",
-    max_episode_steps=1000,
-    reward_threshold=950.0,
-)
-env = safety_gymnasium.make('SauteSafetyInvertedPendulum-v4', render_mode="rgb_array")
+env = safety_gymnasium.make('SauteInvertedPendulum-v4', render_mode="None")
 obs, info = env.reset()
 
-input_act = InputAction()
+#input_act = InputAction()
 
 terminated, truncated = False, False
 ep_ret, ep_cost = 0, 0
@@ -66,7 +66,8 @@ while True:
         obs, info = env.reset()
 
     #print(env.action_space.sample())
-    act = input_act.get_act_from_input(robot)
+#   act = input_act.get_act_from_input(robot)
+    act = env.action_space.sample()
     obs, reward, cost, terminated, truncated, info = env.step(act)
     #bs, reward, cost, terminated, truncated, info = env.step(act)
     print(f"Action: {act}, Reward: {reward}, Cost: {cost}")

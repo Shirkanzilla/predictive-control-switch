@@ -28,7 +28,7 @@ DEFAULT_CAMERA_CONFIG = {
     "distance": 2.04,
 }
 
-class SauteSafetyInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
+class SauteInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
     metadata = {
         "render_modes": [
             "human",
@@ -38,10 +38,10 @@ class SauteSafetyInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         "render_fps": 25,
     }
 
-
     def __init__(self, cost_budget, gamma, **kwargs):
         utils.EzPickle.__init__(self, **kwargs)
         observation_space = Box(low=-np.inf, high=np.inf, shape=(5,), dtype=np.float64)
+        self.obs_space_dict = {"q_pos": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "q_vel": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "cost_budget": Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float64)}
         MujocoEnv.__init__(
             self,
             os.path.join(dir_path, "unlocked_inverted_pendulum.xml"),
@@ -50,8 +50,8 @@ class SauteSafetyInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
             default_camera_config=DEFAULT_CAMERA_CONFIG,
             **kwargs,
         )
-        self._initial_cost_budget = cost_budget
-        self._cost_budget = self._initial_cost_budget
+        self._cost_budget = cost_budget
+        self._safety_state = 1.0
         self.gamma = gamma
 
     def step(self, a):
@@ -66,18 +66,16 @@ class SauteSafetyInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
             reward = 1.0
         else: # punish positions typically reached in recovery less hard
             cost = (1 - angle_to_bad_state / 180.0) ** 3
-
-        self._cost_budget = (self._cost_budget - cost) / self.gamma # discounted update as described in the paper
-        if self._cost_budget <= 0:
+            
+        if self._safety_state <= 0:
+            reward = - 100.0
             terminated = True
-            reward = - 1000.0
-        #if np.abs(ob[1]) > 0.2:
-        #   cost = min(np.abs(ob[1]), 1)
-        #else:
-        #    reward = 1.0
+
+
+        self._safety_state = (self._safety_state - cost / self._cost_budget) / self.gamma # discounted update as described in the paper
         if self.render_mode != None:
             self.render()
-        return ob, reward, 0.0, terminated, False, {}
+        return ob, reward, terminated, False, {'cost': cost}
 
     def reset_model(self):
         qpos = self.init_qpos + self.np_random.uniform(
@@ -86,7 +84,7 @@ class SauteSafetyInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         qvel = self.init_qvel + self.np_random.uniform(
             size=self.model.nv, low=-0.01, high=0.01
         )
-        self._cost_budget = self._initial_cost_budget
+        self._safety_state = 1.0
         self.set_state(qpos, qvel)
         return self._get_obs()
 
@@ -94,19 +92,59 @@ class SauteSafetyInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         base_obs = np.concatenate([self.data.qpos, self.data.qvel]).ravel()
         #return base_obs
         return np.concatenate(
-            [base_obs, np.array([self._cost_budget / self._initial_cost_budget], dtype=np.float32)]
+            [base_obs, np.array([self._safety_state], dtype=np.float32)]
         )
+
+class SafeAgentSauteInvertedPendulumEnv():
+
+    def __init__(self, advanced_mode=False, cost_budget=25.0, gamma=0.999, **kwargs):
+        self._env = SauteInvertedPendulumEnv(cost_budget=cost_budget, gamma=gamma, **kwargs)
+        self.observation_space = self._env.observation_space
+        self.action_space = self._env.action_space
+        self.advanced_mode = advanced_mode
+        self.reset_counter = 0
     
+    def step(self, a):
+        return self._env.step(a)
+    
+    def reset_model(self):
+        # monte carlo sampling of initial states only in harder curriculum mode
+        if self.advanced_mode and random.random() < max(0.5, self.reset_counter / 100): # 50% chance of sampling hard state in advanced mode
+            self.reset_counter += 1
+            qpos = self._env.init_qpos.copy()
+            qpos[0] += self._env.np_random.uniform(low=-0.9, high=0.9) # actual range is from -1 to 1, but we leave a bit of margin
+            qpos[1] += self._env.np_random.uniform(low=-np.pi, high=np.pi) # full range of angles
+
+            qvel = self._env.init_qvel.copy()
+            qvel[0] += self._env.np_random.uniform(low=-2.0, high=2.0) 
+            qvel[1] += self._env.np_random.uniform(low=-6.0, high=6.0)
+            self._env._safety_state = 1.0
+            self._env.set_state(qpos, qvel)
+            return self._env._get_obs()
+        else:
+            return self._env.reset_model()
+    
+    def _get_obs(self):
+        return self._env._get_obs()
+    
+    def close(self):
+        self._env.close()
+
 class OmnisafeSauteInvertedPendulumEnv(CMDP):
-    _support_envs: ClassVar[list[str]] = ["SauteSafetyInvertedPendulum-v4"]
+    _support_envs: ClassVar[list[str]] = ["SauteInvertedPendulum-v4", "SafeAgentBaseSauteInvertedPendulum-v4", "SafeAgentAdvancedSauteInvertedPendulum-v4"]
 
     need_auto_reset_wrapper = True
     need_time_limit_wrapper = False
 
-    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, **kwargs) -> None:
+    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 25.0, gamma: float = 0.999, **kwargs) -> None:
         self._count = 0
         self._num_envs = 1
-        self._inner_env = SauteSafetyInvertedPendulumEnv(cost_budget=25.0, gamma=0.99)
+        if env_id == "SauteInvertedPendulum-v4":
+            self._inner_env = SauteInvertedPendulumEnv(cost_budget=cost_budget, gamma=gamma)
+        elif env_id == "SafeAgentAdvancedSauteInvertedPendulum-v4":
+            self._inner_env = SafeAgentSauteInvertedPendulumEnv(advanced_mode=True, cost_budget=cost_budget, gamma=gamma)
+        else:
+            self._inner_env = SafeAgentSauteInvertedPendulumEnv(advanced_mode=False, cost_budget=cost_budget, gamma=gamma)
         self._observation_space = self._inner_env.observation_space
         self._action_space = self._inner_env.action_space
         self._device = torch.device(device)
@@ -141,7 +179,8 @@ class OmnisafeSauteInvertedPendulumEnv(CMDP):
         action: torch.Tensor,
         ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
         self._count += 1
-        obs, reward, cost, terminated, truncated, info = self._inner_env.step(action.detach().cpu().numpy())
+        obs, reward, terminated, truncated, info = self._inner_env.step(action.detach().cpu().numpy())
+        cost = info['cost']
         truncated = self._count > 1000
         obs, reward, cost, terminated, truncated = (
             torch.as_tensor(x, dtype=torch.float32, device=self._device)
