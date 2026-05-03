@@ -30,12 +30,13 @@ class SauteSafetyGymEnv():
         "render_fps": 25,
     }
 
-    def __init__(self, env_id, cost_budget=25.0, gamma=0.999, unsafe_reward=-100.0, **kwargs):
+    def __init__(self, env_id, cost_budget=25.0, gamma=0.999, unsafe_reward=-100.0, isSaute = True, **kwargs):
         self._env = safety_gymnasium.make(env_id, render_mode=kwargs.get("render_mode", "rgb_array"))
         self._initial_cost_budget = cost_budget
         self._unsafe_reward = unsafe_reward
         self._cost_budget = 1.0
         self._gamma = gamma
+        self.isSaute = isSaute
 
         obs_space = self._env.observation_space
         low = np.concatenate([obs_space.low, [0.0]])
@@ -47,7 +48,7 @@ class SauteSafetyGymEnv():
     def step(self, a):
         obs, reward, cost, terminated, truncated, info = self._env.step(a)
 
-        if self._cost_budget <= 0:
+        if self._cost_budget <= 0 and self.isSaute:
             terminated = True
             reward = self._unsafe_reward
 

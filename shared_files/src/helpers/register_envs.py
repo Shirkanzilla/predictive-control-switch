@@ -2,9 +2,9 @@ import copy
 import gymnasium
 import safety_gymnasium
 from omnisafe.envs.core import env_register, env_unregister
-from helpers.omnisafe_inverted_pendulum import OmnisafeInvertedPendulumEnv
 from helpers.saute_omnisafe_inverted_pendulum import OmnisafeSauteInvertedPendulumEnv
 from helpers.saute_safety_gym_envs import OmnisafeSauteSafetyGymEnvs
+from helpers.neural_shielding import NeuralShieldingEnv
 from typing import Any, ClassVar
 
 def __register_helper(env_id, entry_point, spec_kwargs=None, **kwargs):
@@ -27,22 +27,11 @@ def __register_helper(env_id, entry_point, spec_kwargs=None, **kwargs):
     )
 
 def register_envs():
-    gymnasium.register(id="SafetyInvertedPendulum-v4",
-      entry_point="helpers.omnisafe_inverted_pendulum:SafetyInvertedPendulumEnv",
-        max_episode_steps=1000,
-        reward_threshold=950.0,
-    )
     gymnasium.register(id="SauteInvertedPendulum-v4",
         entry_point="helpers.saute_omnisafe_inverted_pendulum:SauteInvertedPendulumEnv",
         max_episode_steps=1000,
         reward_threshold=950.0,
     )
-
-    
-@env_register
-@env_unregister
-class OmnisafeInvertedPendulum(OmnisafeInvertedPendulumEnv):
-    pass
 
 @env_register
 @env_unregister
@@ -53,3 +42,11 @@ class SauteOmnisafeInvertedPendulum(OmnisafeSauteInvertedPendulumEnv):
 @env_unregister
 class SauteOmnisafeSafetyGymEnvs(OmnisafeSauteSafetyGymEnvs):
     pass
+
+@env_register
+@env_unregister
+class NeuralShieldingEnvs(NeuralShieldingEnv):
+    def __init__(self, env_id:str, **kwargs) -> None:
+        super(NeuralShieldingEnvs, self).__init__(env_id, **kwargs)
+
+        

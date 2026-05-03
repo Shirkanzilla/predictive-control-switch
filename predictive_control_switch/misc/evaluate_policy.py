@@ -42,7 +42,6 @@ agents = [
 
 env_id = env_id.replace("SafeAgentBase", "").replace("SafeAgentAdvanced", "") # We want to evaluate the policy on the original environment, not the monte carlo sampling wrapper
 env_id = env_id.replace("SafeAgent", "")
-
 if __name__ == '__main__':
     if algorithm == 'PPOSaute':
         print("Using SauteOfflineDataCollector")
@@ -56,13 +55,12 @@ if __name__ == '__main__':
 
 data = np.load(save_dir + "/" + env_id + "_data.npz")
 
-df = pd.DataFrame({'reward': data['reward'].squeeze(), 'cost': data['cost'].squeeze()})
-df['cost_budget'] = data['obs'][:, -1].squeeze()
+df = pd.DataFrame({'reward': data['reward'].squeeze(), 'cost': data['cost'].squeeze(), 'cost_budget': data['obs'][:, -1].squeeze(), 'done': data['done'].squeeze()})
 print(df.describe())
 
 df_budget_exceeded= df.where(df['reward'] == -100)
 
-df_trajectory_starts = df.where(df['cost_budget'] == df['reward'])
+df_trajectory_ends = df.where(df['done'] == True)
 
-print("Percentage of trajectories that exceeded the cost budget:", df_budget_exceeded.count()[0] / df_trajectory_starts.count()[0])
-print("Percentage of trajectories in cost budget:", 1 - df_budget_exceeded.count()[0] / df_trajectory_starts.count()[0])
+print("Percentage of trajectories that exceeded the cost budget:", df_budget_exceeded.count()[0] / df_trajectory_ends.count()[0])
+print("Percentage of trajectories in cost budget:", 1 - df_budget_exceeded.count()[0] / df_trajectory_ends.count()[0])

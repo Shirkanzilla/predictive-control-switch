@@ -3,6 +3,7 @@ from time import time
 import numpy as np
 from omnisafe.models.actor import GaussianLearningActor
 import safety_gymnasium
+from gymnasium import spaces
 import gymnasium
 import torch
 from load_model import load_guide
@@ -13,8 +14,8 @@ from multiprocessing import Pool
 from functools import partial
 
 from helpers.register_envs import register_envs
-from helpers.omnisafe_inverted_pendulum import SafetyInvertedPendulumEnv
 from helpers.saute_omnisafe_inverted_pendulum import SauteInvertedPendulumEnv
+from helpers.saute_safety_gym_envs import SauteSafetyGymEnv
 
 def create_random_agent(env, hidden_layers=[255,255,255,255], activation='relu', weight_initialization_mode='orthogonal'):
     obs_space = env.observation_space
@@ -28,7 +29,7 @@ def run_trajectory(env, agent, safe_agent, min_rand_steps=100, max_rand_steps=40
     sampling_step = 0
     agent_instance_for_pos = None
     try:
-        if not isinstance(env.unwrapped, SafetyInvertedPendulumEnv) and not isinstance(env.unwrapped, SauteInvertedPendulumEnv):
+        if not isinstance(env.unwrapped, SauteInvertedPendulumEnv):
             agent_instance_for_pos = env.unwrapped.__getattribute__("task").agent
     except:
         pass
@@ -69,6 +70,8 @@ def init_worker(env_id):
     global env
     if env_id == "SauteInvertedPendulum-v4":
         env = safety_gymnasium.wrappers.Gymnasium2SafetyGymnasium(gymnasium.make(env_id, cost_budget=25.0, gamma=0.99))
+    elif "Saute" in env_id:
+        env = SauteSafetyGymEnv(env_id.replace("Saute", "Safety"), render_mode=None)
     else:
         env = safety_gymnasium.make(env_id, render_mode=None)
 
@@ -123,12 +126,18 @@ if __name__ == "__main__":
     # instantiate the env here again to get obs and action space for column names
     if env_id == "SauteInvertedPendulum-v4":
         env = safety_gymnasium.wrappers.Gymnasium2SafetyGymnasium(gymnasium.make(env_id, cost_budget=25.0, gamma=0.99))
+        obs_space_dict = env.obs_space_dict 
+    elif "Saute" in env_id:
+        env = SauteSafetyGymEnv(env_id.replace("Saute", "Safety"), render_mode=None)
+        obs_space_dict = env._env.obs_space_dict
+        obs_space_dict['safety_state'] = spaces.Box(-np.inf, np.inf)
     else:
         env = safety_gymnasium.make(env_id, render_mode=None)
-        
+        obs_space_dict = env.obs_space_dict 
+
     obs_columns = []
-    for key in env.obs_space_dict.keys():
-        for i in range(env.obs_space_dict[key].shape[0]):
+    for key in obs_space_dict.keys():
+        for i in range(obs_space_dict[key].shape[0]):
             obs_columns.append(f'{key}_{i}')
     for i in range(env.action_space.shape[0]):
         obs_columns.append(f'action_{i}')

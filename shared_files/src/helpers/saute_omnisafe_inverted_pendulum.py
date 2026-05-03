@@ -38,7 +38,7 @@ class SauteInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         "render_fps": 25,
     }
 
-    def __init__(self, cost_budget, gamma, **kwargs):
+    def __init__(self, cost_budget, gamma, isSaute = True, **kwargs):
         utils.EzPickle.__init__(self, **kwargs)
         observation_space = Box(low=-np.inf, high=np.inf, shape=(5,), dtype=np.float64)
         self.obs_space_dict = {"q_pos": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "q_vel": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "cost_budget": Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float64)}
@@ -53,25 +53,27 @@ class SauteInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         self._cost_budget = cost_budget
         self._safety_state = 1.0
         self.gamma = gamma
+        self.isSaute = isSaute
 
     def step(self, a):
         self.do_simulation(a, self.frame_skip)
         ob = self._get_obs()
-        terminated = bool(not np.isfinite(ob).all()) # or (np.abs(ob[1]) > 1))
-        reward = 0.0
+        terminated = bool(not np.isfinite(ob).all()) 
+        vertical_velocity = np.abs(ob[2])
+        reward = max(1.0, vertical_velocity/4.0) # objective is to move fast horizontically
         angle = np.degrees(np.abs(ob[1])) % 360
         angle_to_bad_state = np.abs(angle - 180)
+
         if np.abs(ob[1]) <= 0.2: # about 11,46 degrees
             cost = 0.0
-            reward = 1.0
         else: # punish positions typically reached in recovery less hard
             cost = (1 - angle_to_bad_state / 180.0) ** 3
             
-        if self._safety_state <= 0:
+        if self._safety_state <= 0 and self.isSaute:
             reward = - 100.0
             terminated = True
 
-
+        
         self._safety_state = (self._safety_state - cost / self._cost_budget) / self.gamma # discounted update as described in the paper
         if self.render_mode != None:
             self.render()
@@ -105,7 +107,12 @@ class SafeAgentSauteInvertedPendulumEnv():
         self.reset_counter = 0
     
     def step(self, a):
-        return self._env.step(a)
+        ob, reward, terminated, truncated, info = self._env.step(a)
+        reward = 1.0 
+        if info['cost'] > 0:
+            reward = -info['cost'] # for the safe agent the objective is to minimize cost. This here is reward engineering to promote safe behaviour
+
+        return ob, reward, terminated, truncated, info
     
     def reset_model(self):
         # monte carlo sampling of initial states only in harder curriculum mode
@@ -131,15 +138,17 @@ class SafeAgentSauteInvertedPendulumEnv():
         self._env.close()
 
 class OmnisafeSauteInvertedPendulumEnv(CMDP):
-    _support_envs: ClassVar[list[str]] = ["SauteInvertedPendulum-v4", "SafeAgentBaseSauteInvertedPendulum-v4", "SafeAgentAdvancedSauteInvertedPendulum-v4"]
+    _support_envs: ClassVar[list[str]] = ["SafetyInvertedPendulum-v4", "SauteInvertedPendulum-v4", "SafeAgentBaseSauteInvertedPendulum-v4", "SafeAgentAdvancedSauteInvertedPendulum-v4"]
 
     need_auto_reset_wrapper = True
     need_time_limit_wrapper = False
 
-    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 25.0, gamma: float = 0.999, **kwargs) -> None:
+    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 50.0, gamma: float = 0.999, **kwargs) -> None:
         self._count = 0
         self._num_envs = 1
-        if env_id == "SauteInvertedPendulum-v4":
+        if env_id == "SafetyInvertedPendulum-v4":
+            self._inner_env = SauteInvertedPendulumEnv(cost_budget=cost_budget, gamma=gamma, isSaute=False)
+        elif env_id == "SauteInvertedPendulum-v4":
             self._inner_env = SauteInvertedPendulumEnv(cost_budget=cost_budget, gamma=gamma)
         elif env_id == "SafeAgentAdvancedSauteInvertedPendulum-v4":
             self._inner_env = SafeAgentSauteInvertedPendulumEnv(advanced_mode=True, cost_budget=cost_budget, gamma=gamma)
