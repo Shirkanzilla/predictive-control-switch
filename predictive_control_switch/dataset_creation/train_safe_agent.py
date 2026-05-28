@@ -31,6 +31,9 @@ custom_cfgs = {
     },
 }
 
+if "FrozenLake" in env_id:
+    custom_cfgs["algo_cfgs"] = {"obs_normalize": False}
+
 if previous_model_path is None:
     env_id = f"SafeAgentBase{env_id}" if curriculum_learning else env_id
     agent = omnisafe.Agent(algorithm, env_id=env_id, custom_cfgs=custom_cfgs)

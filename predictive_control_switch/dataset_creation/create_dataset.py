@@ -68,8 +68,8 @@ def run_trajectory(env, agent, safe_agent, min_rand_steps=100, max_rand_steps=40
 
 def init_worker(env_id):
     global env
-    if env_id == "SauteInvertedPendulum-v4":
-        env = safety_gymnasium.wrappers.Gymnasium2SafetyGymnasium(gymnasium.make(env_id, cost_budget=25.0, gamma=0.99))
+    if env_id == "SafetyInvertedPendulum-v4":
+        env = safety_gymnasium.wrappers.Gymnasium2SafetyGymnasium(gymnasium.make(env_id.replace("Safety", "Saute"), cost_budget=25.0, gamma=0.99, isSaute=False))
     elif "Saute" in env_id:
         env = SauteSafetyGymEnv(env_id.replace("Saute", "Safety"), render_mode=None)
     else:
@@ -124,8 +124,8 @@ if __name__ == "__main__":
     data, labels = generate_dataset(env_id, safe_agent, amount=amount, min_rand_steps=min_rand_steps, max_rand_steps=max_rand_steps, cost_window=cost_window, deterministic=deterministic, n_processes=n_processes)
 
     # instantiate the env here again to get obs and action space for column names
-    if env_id == "SauteInvertedPendulum-v4":
-        env = safety_gymnasium.wrappers.Gymnasium2SafetyGymnasium(gymnasium.make(env_id, cost_budget=25.0, gamma=0.99))
+    if env_id == "SafetyInvertedPendulum-v4":
+        env = safety_gymnasium.wrappers.Gymnasium2SafetyGymnasium(gymnasium.make(env_id.replace("Safety", "Saute"), cost_budget=25.0, gamma=0.99, isSaute=False))
         obs_space_dict = env.obs_space_dict 
     elif "Saute" in env_id:
         env = SauteSafetyGymEnv(env_id.replace("Saute", "Safety"), render_mode=None)

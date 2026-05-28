@@ -26,6 +26,7 @@ custom_cfgs = {
         'device' : device,
     },
 }
+eg = ExperimentGrid(exp_name="NeuralShielding")
 for algorithm in ['PPOLag', 'PPOSaute']:
     if 'Saute' in algorithm:
         agent = omnisafe.Agent(algorithm.replace("Saute", ""), env_id=env_id.replace("Safety", "Saute"), custom_cfgs=custom_cfgs)

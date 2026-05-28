@@ -32,7 +32,7 @@ class NeuralShieldingEnv(CMDP):
     need_time_limit_wrapper = False
 
 
-    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 25.0, gamma: float = 0.999, regressor: BaseEstimator = None, classifier: BaseEstimator = None, safe_agent: Any = None, **kwargs) -> None:
+    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 25.0, gamma: float = 0.999, regressor: BaseEstimator = None, classifier: BaseEstimator = None, safe_agent: Any = None, scaler: Any = None, **kwargs) -> None:
         '''
         '''
         self.isSaute = "Saute" in env_id
@@ -40,9 +40,10 @@ class NeuralShieldingEnv(CMDP):
         self._count = 0
         self._last_obs = None
         self._num_envs = 1
-        self.regressor = regressor
         self._cost_budget = cost_budget
+        self.regressor = regressor
         self.classifier = classifier
+        self.scaler = scaler
         self.safe_agent = safe_agent
         if env_id == "NeuralShieldingInvertedPendulum-v4":
             self._inner_env = SauteInvertedPendulumEnv(cost_budget=cost_budget, gamma=gamma, isSaute=self.isSaute)
@@ -87,18 +88,27 @@ class NeuralShieldingEnv(CMDP):
         action: torch.Tensor,
         ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
         self._count += 1
-        action_to_perform = action.detach().numpy()
-        data = np.append(self._last_obs, action_to_perform)
-        data = torch.from_numpy(data).float()
-        data = data.unsqueeze(0)
-        data = data.to(self._device)
-        with torch.no_grad():
-            if self.classifier.predict(data) > 0.5:
-                if (self.regressor.predict(data) / self._cost_budget) > self._inner_env._safety_state: # if the predicted cost exceeds the remaining cost budget
-                    action_to_perform = self.safe_agent.predict(torch.from_numpy(self._last_obs).float()).detach().numpy() # change to action to one picked by the safe agent
-        obs, reward, terminated, truncated, info = self._inner_env.step(action_to_perform)
-        self._last_obs = obs
 
+        action_np = action.detach().cpu().numpy()
+        data_np = np.append(self._last_obs, action_np)
+
+        if self.scaler is not None:
+            data_np = self.scaler.transform(data_np.reshape(1, -1))
+        else:
+            data_np = data_np.reshape(1, -1)
+
+        data = torch.from_numpy(data_np).float().to(torch.device("cuda"))
+        with torch.no_grad():
+            expect_cost = True
+            if self.classifier is not None:
+                expect_cost = self.classifier(data).item() > 0.5
+            if expect_cost:
+                if (self.regressor(data).item() / self._cost_budget) > self._inner_env._safety_state: # if the predicted cost exceeds the remaining cost budget
+                    safe_action = self.safe_agent.predict(torch.from_numpy(self._last_obs).float()).to(self._device) # change to action to one picked by the safe agent
+                    action_np = safe_action.detach().cpu().numpy()
+        obs, reward, terminated, truncated, info = self._inner_env.step(action_np)
+
+        self._last_obs = obs
         cost = info['cost']
         truncated = self._count > 1000
         obs, reward, cost, terminated, truncated = (

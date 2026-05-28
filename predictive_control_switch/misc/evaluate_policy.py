@@ -26,6 +26,7 @@ class SauteOfflineDataCollector(OfflineDataCollector):
 register_envs()
 
 if len(sys.argv) < 4:
+    
     print("Usage: python evaluate_policy.py [env_id] [algorithm] [seed/subdir name] [epoch]")
     sys.exit(1)
 
@@ -40,8 +41,8 @@ agents = [
     (save_dir, f'epoch-{epoch}.pt', 100_000),
 ]
 
-env_id = env_id.replace("SafeAgentBase", "").replace("SafeAgentAdvanced", "") # We want to evaluate the policy on the original environment, not the monte carlo sampling wrapper
-env_id = env_id.replace("SafeAgent", "")
+env_id = env_id.replace("Advanced", "Base") # We want to evaluate the policy on the original environment, not the monte carlo sampling wrapper
+
 if __name__ == '__main__':
     if algorithm == 'PPOSaute':
         print("Using SauteOfflineDataCollector")

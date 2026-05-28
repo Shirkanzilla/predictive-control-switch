@@ -41,7 +41,10 @@ class SauteInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
     def __init__(self, cost_budget, gamma, isSaute = True, **kwargs):
         utils.EzPickle.__init__(self, **kwargs)
         observation_space = Box(low=-np.inf, high=np.inf, shape=(5,), dtype=np.float64)
-        self.obs_space_dict = {"q_pos": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "q_vel": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "cost_budget": Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float64)}
+        if isSaute:
+            self.obs_space_dict = {"q_pos": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "q_vel": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "cost_budget": Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float64)}
+        else:
+            self.obs_space_dict = {"q_pos": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64), "q_vel": Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float64)}
         MujocoEnv.__init__(
             self,
             os.path.join(dir_path, "unlocked_inverted_pendulum.xml"),
@@ -59,8 +62,8 @@ class SauteInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
         self.do_simulation(a, self.frame_skip)
         ob = self._get_obs()
         terminated = bool(not np.isfinite(ob).all()) 
-        vertical_velocity = np.abs(ob[2])
-        reward = max(1.0, vertical_velocity/4.0) # objective is to move fast horizontically
+        horizontal_velocity = np.abs(ob[2])
+        reward = min(1.0, horizontal_velocity/4.0) # objective is to move fast horizontically
         angle = np.degrees(np.abs(ob[1])) % 360
         angle_to_bad_state = np.abs(angle - 180)
 
@@ -92,10 +95,12 @@ class SauteInvertedPendulumEnv(MujocoEnv, utils.EzPickle):
 
     def _get_obs(self):
         base_obs = np.concatenate([self.data.qpos, self.data.qvel]).ravel()
-        #return base_obs
-        return np.concatenate(
-            [base_obs, np.array([self._safety_state], dtype=np.float32)]
-        )
+        if self.isSaute:
+            return np.concatenate(
+                [base_obs, np.array([self._safety_state], dtype=np.float32)]
+            )
+        else:
+            return base_obs
 
 class SafeAgentSauteInvertedPendulumEnv():
 
@@ -108,10 +113,10 @@ class SafeAgentSauteInvertedPendulumEnv():
     
     def step(self, a):
         ob, reward, terminated, truncated, info = self._env.step(a)
-        reward = 1.0 
-        if info['cost'] > 0:
-            reward = -info['cost'] # for the safe agent the objective is to minimize cost. This here is reward engineering to promote safe behaviour
-
+        if reward >= 0:
+            reward = 1.0 
+            if info['cost'] > 0:
+                reward = -info['cost'] # for the safe agent the objective is to minimize cost. This here is reward engineering to promote safe behaviour
         return ob, reward, terminated, truncated, info
     
     def reset_model(self):
@@ -143,7 +148,7 @@ class OmnisafeSauteInvertedPendulumEnv(CMDP):
     need_auto_reset_wrapper = True
     need_time_limit_wrapper = False
 
-    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 50.0, gamma: float = 0.999, **kwargs) -> None:
+    def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 50.0, gamma: float = 0.99, **kwargs) -> None:
         self._count = 0
         self._num_envs = 1
         if env_id == "SafetyInvertedPendulum-v4":

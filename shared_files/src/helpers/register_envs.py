@@ -2,6 +2,7 @@ import copy
 import gymnasium
 import safety_gymnasium
 from omnisafe.envs.core import env_register, env_unregister
+from helpers.saute_gridworlds import OmnisafeGridWorldsEnv
 from helpers.saute_omnisafe_inverted_pendulum import OmnisafeSauteInvertedPendulumEnv
 from helpers.saute_safety_gym_envs import OmnisafeSauteSafetyGymEnvs
 from helpers.neural_shielding import NeuralShieldingEnv
@@ -32,6 +33,11 @@ def register_envs():
         max_episode_steps=1000,
         reward_threshold=950.0,
     )
+
+@env_register
+@env_unregister
+class SauteOmnisafeGridWorlds(OmnisafeGridWorldsEnv):
+    pass
 
 @env_register
 @env_unregister
