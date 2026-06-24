@@ -18,7 +18,7 @@ for item in os.scandir(os.path.join(LOG_DIR, 'torch_save')):
         if item.name.split('.')[0] == 'epoch-0':
             continue
         evaluator.load_saved(
-            save_dir=LOG_DIR, model_name=item.name, camera_name='track', width=256, height=256, render_mode='rgb_array'
+            save_dir=LOG_DIR, model_name=item.name, width=256, height=256, render_mode='rgb_array'
         )
         evaluator.render(num_episodes=1)
         evaluator.evaluate(num_episodes=100)

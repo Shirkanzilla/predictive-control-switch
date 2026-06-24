@@ -1,41 +1,39 @@
 from __future__ import annotations
 
-import os
 import random
-import omnisafe
 from typing import Any, ClassVar
 
 import torch
 from gymnasium import spaces
 
-from omnisafe.envs.core import CMDP, env_register, env_unregister
+from omnisafe.envs.core import CMDP
 from omnisafe.typing import DEVICE_CPU, Box
 
 import numpy as np
 
-from gymnasium import utils
 from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv
 from gymnasium.envs.toy_text.utils import categorical_sample
 from gymnasium.spaces import Box
 
 import omnisafe
-from omnisafe.envs.core import env_register
 
 class CustomFrozenLake(FrozenLakeEnv):
+    metadata = {
+        "render_modes": ["human", "ansi", "rgb_array"],
+        "render_fps": 4,
+    }
     def __init__(self, cost_budget, gamma, isSaute = True, **kwargs):
-        super().__init__(map_name="8x8")
+        super().__init__(map_name="8x8", is_slippery=False, render_mode="rgb_array")
         self.obs_space_dict = {}
         for i in range(64):
             self.obs_space_dict[f"state_{i}"] =  Box(low=0.0, high=1.0, shape=(1,), dtype=np.float32)
         if isSaute:
-            self.obs_space_dict["cost_budget"] =  Box(low=0.0, high=1.0, shape=(1,), dtype=np.float32)
+            self.obs_space_dict["cost_budget"] =  Box(low=0.0, high=np.inf, shape=(1,), dtype=np.float32)
             # one hot encoding of the state space + the cost budget
-            self.observation_space = spaces.Box(
-                low=0.0,
-                high=1.0,
-                shape=(65,),
-                dtype=np.float32
-            ) 
+            low = np.zeros(65, dtype=np.float32)
+            high = np.ones(65, dtype=np.float32)
+            high[-1] = np.inf
+            self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
         else:
             self.observation_space = spaces.Box(
                 low=0.0,
@@ -47,6 +45,7 @@ class CustomFrozenLake(FrozenLakeEnv):
                 low=0.0,
                 high=1.0,
                 shape=(4,),
+                dtype=np.float32
         )
         self._cost_budget = cost_budget
         self._safety_state = 1.0
@@ -54,12 +53,15 @@ class CustomFrozenLake(FrozenLakeEnv):
         self.isSaute = isSaute
 
     def step(self, a):
-        a = np.nan_to_num(a, nan=0.0)
+        if np.nan in a:
+            print(a)
+        #a = np.nan_to_num(a, nan=0.0)
         state, reward, terminated, truncated, info = super().step(np.argmax(a)) # pick the highest valued action
         ob = self._get_obs(state)
         assert np.all(np.isfinite(ob))
-        cost = 1.0 if terminated else 0.0
-        terminated = False
+        cost = 1.0 if terminated and reward == 0 else 0.0
+        if terminated:
+            terminated = False
             
         if self._safety_state <= 0 and self.isSaute:
             reward = - 100.0
@@ -84,8 +86,10 @@ class CustomFrozenLake(FrozenLakeEnv):
 
     def _get_obs(self, state):
         assert np.isfinite(self._safety_state), self._safety_state
+        assert isinstance(state, int), state
         base_obs = np.zeros(64)
         base_obs[state] = 1.0
+        assert np.count_nonzero(base_obs) == 1, base_obs
         if self.isSaute:
             return np.concatenate(
                 [base_obs, np.array([self._safety_state], dtype=np.float32)]
@@ -94,7 +98,10 @@ class CustomFrozenLake(FrozenLakeEnv):
             return base_obs
 
 class SafeAgentWrapper():
-
+    metadata = {
+        "render_modes": ["human", "ansi", "rgb_array"],
+        "render_fps": 4,
+    }
     def __init__(self, cost_budget=25.0, gamma=0.999, **kwargs):
         self._env = CustomFrozenLake(cost_budget=cost_budget, gamma=gamma, **kwargs)
         self.observation_space = self._env.observation_space
@@ -112,7 +119,14 @@ class SafeAgentWrapper():
         state_distribution = np.ones(self._env.desc.shape).ravel()
         state_distribution /= state_distribution.sum()
         self._env.s = categorical_sample(state_distribution, self._env.np_random)
-        return self._get_obs(self._env.s), {'cost': 0, 'prob': 1}
+        # go one random step from it to get correct state and cost info
+        a = np.zeros(4)
+        a[np.random.randint(0,4)] = 1
+        ob, _, _, _, info = self._env.step(a)
+        return ob, info
+    
+    def render(self):
+        return self._env.render()
     
     def _get_obs(self, s):
         return self._env._get_obs(s)
@@ -129,7 +143,7 @@ class OmnisafeGridWorldsEnv(CMDP):
     def __init__(self, env_id: str, device: torch.device = DEVICE_CPU, cost_budget: float = 3.0, gamma: float = 0.99, **kwargs) -> None:
         self._count = 0
         self._num_envs = 1
-        if env_id == "SauteFrozenLakee":
+        if env_id == "SauteFrozenLake":
             self._inner_env = CustomFrozenLake(cost_budget=cost_budget, gamma=gamma)
         elif env_id == "SafeAgentSauteFrozenLake":
             self._inner_env = SafeAgentWrapper(cost_budget=cost_budget, gamma=gamma)
@@ -159,7 +173,7 @@ class OmnisafeGridWorldsEnv(CMDP):
         return 100
     
     def render(self) -> Any:
-        pass
+        return self._inner_env.render()
 
     def close(self) -> Any:
         self._inner_env.close()
