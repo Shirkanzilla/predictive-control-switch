@@ -1,6 +1,5 @@
 # Single Python File
 import os
-from numpy.random import seed
 import omnisafe
 import sys
 from helpers.register_envs import register_envs

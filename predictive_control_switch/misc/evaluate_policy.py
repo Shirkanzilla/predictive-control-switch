@@ -4,7 +4,7 @@ from helpers.register_envs import register_envs
 from omnisafe.common.offline.data_collector import OfflineDataCollector
 from omnisafe.adapter import SauteAdapter
 from omnisafe.envs.wrapper import ActionScale
-from omnisafe.utils.config import Config, get_default_kwargs_yaml
+from omnisafe.utils.config import get_default_kwargs_yaml
 import torch
 import numpy as np
 import pandas as pd

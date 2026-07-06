@@ -1,8 +1,6 @@
 import os
 #from pynput.keyboard import Listener, KeyCode
-import helpers.saute_omnisafe_inverted_pendulum
 import safety_gymnasium
-import gymnasium
 from time import sleep
 from helpers.register_envs import register_envs
 

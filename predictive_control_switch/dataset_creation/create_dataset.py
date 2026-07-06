@@ -7,7 +7,6 @@ from gymnasium import spaces
 import gymnasium
 import torch
 from load_model import load_guide
-from tqdm import tqdm
 import pandas as pd
 import sys
 from multiprocessing import Pool

@@ -56,18 +56,20 @@ class CustomFrozenLake(FrozenLakeEnv):
         if np.nan in a:
             print(a)
         #a = np.nan_to_num(a, nan=0.0)
-        state, reward, terminated, truncated, info = super().step(np.argmax(a)) # pick the highest valued action
+        a_noised = a + np.random.uniform(0, 1e-8, size=a.shape) # break ties if values for different directions are identical
+        state, reward, terminated, truncated, info = super().step(np.argmax(a_noised)) # pick the highest valued action
         ob = self._get_obs(state)
         assert np.all(np.isfinite(ob))
         cost = 1.0 if terminated and reward == 0 else 0.0
         if terminated:
             terminated = False
             
+        self._safety_state = (self._safety_state - cost / self._cost_budget) / self.gamma # discounted update as described in the paper
+
         if self._safety_state <= 0 and self.isSaute:
             reward = - 100.0
             terminated = True
         
-        self._safety_state = (self._safety_state - cost / self._cost_budget) / self.gamma # discounted update as described in the paper
         if self.render_mode != None:
             self.render()
         
@@ -110,7 +112,7 @@ class SafeAgentWrapper():
     def step(self, a):
         ob, reward, terminated, truncated, info = self._env.step(a)
         if reward >= 0:
-            reward = -info["cost"]
+            reward = 0.01 - info["cost"] # small reward for safe steps
         return ob, reward, terminated, truncated, info
     
     def reset(self):
@@ -122,6 +124,8 @@ class SafeAgentWrapper():
         # go one random step from it to get correct state and cost info
         a = np.zeros(4)
         a[np.random.randint(0,4)] = 1
+        # (maybe later) randomize safety state to cover the full range the agent might inherit
+        # elf._env._safety_state = np.random.uniform(0.1, 1.0)
         ob, _, _, _, info = self._env.step(a)
         return ob, info
     
@@ -163,9 +167,9 @@ class OmnisafeGridWorldsEnv(CMDP):
         ) -> tuple[torch.Tensor, dict]:
         if seed is not None:
             self.set_seed(seed)
-        obs = self._inner_env.reset()[0]
+        obs, info = self._inner_env.reset()
         self._count = 0
-        return torch.as_tensor(obs, dtype=torch.float32, device=self._device), {}
+        return torch.as_tensor(obs, dtype=torch.float32, device=self._device), info
 
     @property
     def max_episode_steps(self) -> None:
